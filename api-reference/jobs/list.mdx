@@ -1,0 +1,218 @@
+---
+title: "List Jobs"
+api: "GET /api/v1/projects/{project_id}/jobs"
+description: "Retrieve all ingestion jobs for a project"
+---
+
+## Endpoint
+
+```
+GET https://api.intellibase.dev/api/v1/projects/{project_id}/jobs
+```
+
+## Path Parameters
+
+<ParamField path="project_id" type="string" required>
+  The unique identifier of the project
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="limit" type="integer" default={100}>
+  Maximum number of jobs to return (1-1000)
+</ParamField>
+
+<ParamField query="offset" type="integer" default={0}>
+  Number of jobs to skip for pagination (0+)
+</ParamField>
+
+## Authentication
+
+Requires a valid API key with access to the project.
+
+## Response
+
+<ResponseField name="jobs" type="array">
+  Array of ingestion job objects (sorted by most recent first)
+  
+  <Expandable title="Job Object">
+    <ResponseField name="job_id" type="string">
+      Unique identifier for the job
+    </ResponseField>
+
+    <ResponseField name="project_id" type="string">
+      The project this job belongs to
+    </ResponseField>
+
+    <ResponseField name="source_doc_id" type="string">
+      The document identifier from the ingestion request
+    </ResponseField>
+
+    <ResponseField name="status" type="string">
+      Job status: `pending`, `running`, `completed`, or `failed`
+    </ResponseField>
+
+    <ResponseField name="chunks_processed" type="integer">
+      Number of text chunks processed
+    </ResponseField>
+
+    <ResponseField name="nodes_created" type="integer">
+      Number of entities created (0 for Vector-Only projects)
+    </ResponseField>
+
+    <ResponseField name="edges_created" type="integer">
+      Number of relationships created (0 for Vector-Only projects)
+    </ResponseField>
+
+    <ResponseField name="started_at" type="string" format="datetime">
+      When the job started processing
+    </ResponseField>
+
+    <ResponseField name="completed_at" type="string" format="datetime" optional>
+      When the job finished (null if still running or pending)
+    </ResponseField>
+
+    <ResponseField name="error_message" type="string" optional>
+      Error details if status is `failed`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of jobs returned
+</ResponseField>
+
+<ResponseField name="limit" type="integer">
+  The limit used for pagination
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  The offset used for pagination
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl "https://api.intellibase.dev/api/v1/projects/proj-abc123/jobs?limit=50&offset=0" \
+  -H "Authorization: Bearer ib-your-api-key"
+```
+
+```python Python
+import requests
+
+project_id = "proj-abc123"
+
+response = requests.get(
+    f"https://api.intellibase.dev/api/v1/projects/{project_id}/jobs",
+    headers={"Authorization": "Bearer ib-your-api-key"},
+    params={"limit": 50, "offset": 0}
+)
+
+result = response.json()
+print(f"Found {result['total']} jobs")
+
+for job in result["jobs"]:
+    status_emoji = {"completed": "✓", "failed": "✗", "running": "⏳", "pending": "⏸"}.get(job["status"], "?")
+    print(f"{status_emoji} {job['source_doc_id']}: {job['status']}")
+    if job["status"] == "completed":
+        print(f"   {job['chunks_processed']} chunks, {job['nodes_created']} nodes, {job['edges_created']} edges")
+```
+
+```typescript TypeScript
+const projectId = "proj-abc123";
+
+const response = await fetch(
+  `https://api.intellibase.dev/api/v1/projects/${projectId}/jobs?limit=50&offset=0`,
+  {
+    headers: {
+      "Authorization": "Bearer ib-your-api-key"
+    }
+  }
+);
+
+const result = await response.json();
+console.log(`Found ${result.total} jobs`);
+
+const statusEmoji = {
+  completed: "✓",
+  failed: "✗",
+  running: "⏳",
+  pending: "⏸"
+};
+
+result.jobs.forEach(job => {
+  const emoji = statusEmoji[job.status] || "?";
+  console.log(`${emoji} ${job.source_doc_id}: ${job.status}`);
+  if (job.status === "completed") {
+    console.log(`   ${job.chunks_processed} chunks, ` +
+                `${job.nodes_created} nodes, ${job.edges_created} edges`);
+  }
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 Success
+{
+  "jobs": [
+    {
+      "job_id": "job-abc123",
+      "project_id": "proj-abc123",
+      "source_doc_id": "doc-001",
+      "status": "completed",
+      "chunks_processed": 12,
+      "nodes_created": 8,
+      "edges_created": 15,
+      "started_at": "2024-01-15T10:30:00Z",
+      "completed_at": "2024-01-15T10:30:15Z",
+      "error_message": null
+    },
+    {
+      "job_id": "job-def456",
+      "project_id": "proj-abc123",
+      "source_doc_id": "doc-002",
+      "status": "running",
+      "chunks_processed": 0,
+      "nodes_created": 0,
+      "edges_created": 0,
+      "started_at": "2024-01-15T10:29:00Z",
+      "completed_at": null,
+      "error_message": null
+    },
+    {
+      "job_id": "job-ghi789",
+      "project_id": "proj-abc123",
+      "source_doc_id": "doc-003",
+      "status": "failed",
+      "chunks_processed": 5,
+      "nodes_created": 3,
+      "edges_created": 2,
+      "started_at": "2024-01-15T10:28:00Z",
+      "completed_at": "2024-01-15T10:28:10Z",
+      "error_message": "LLM API timeout after 3 retries"
+    }
+  ],
+  "total": 3,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+```json 403 Forbidden
+{
+  "detail": "User is not authorized for this project"
+}
+```
+
+</ResponseExample>
+
+<Info>
+  Jobs are sorted by **most recent first** (newest at the top).
+</Info>
+
+<Tip>
+  Use pagination to browse large job histories efficiently. Set `limit=50` or `limit=100` for best performance.
+</Tip>
+

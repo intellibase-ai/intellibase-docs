@@ -1,0 +1,174 @@
+---
+title: "Create Project"
+api: "POST /api/v1/projects"
+description: "Create a new Intellibase project in KG+Vector or Vector-Only mode"
+---
+
+## Endpoint
+
+```
+POST https://api.intellibase.dev/api/v1/projects
+```
+
+## Authentication
+
+Requires a valid API key.
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Descriptive name for your project
+</ParamField>
+
+<ParamField body="vector_only" type="boolean" default={false}>
+  - `true`: Vector-Only mode (no knowledge graph, semantic search only)
+  - `false`: KG+Vector mode (requires ontology_id)
+</ParamField>
+
+<ParamField body="ontology_id" type="string" optional>
+  Required if `vector_only` is `false`. The ID of an existing ontology.
+</ParamField>
+
+## Response
+
+<ResponseField name="project_id" type="string">
+  Unique identifier for the created project
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Project name
+</ResponseField>
+
+<ResponseField name="mode" type="string">
+  Operating mode: `vector_only` or `kg_vector`
+</ResponseField>
+
+<ResponseField name="created_at" type="string" format="datetime">
+  When the project was created
+</ResponseField>
+
+<ResponseField name="ontology" type="object" optional>
+  The ontology schema (null for Vector-Only projects)
+</ResponseField>
+
+<ResponseField name="config" type="object">
+  Project configuration
+</ResponseField>
+
+<RequestExample>
+
+```bash KG+Vector Project
+curl -X POST https://api.intellibase.dev/api/v1/projects \
+  -H "Authorization: Bearer ib-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Engineering Knowledge Base",
+    "ontology_id": "ont-abc123"
+  }'
+```
+
+```bash Vector-Only Project
+curl -X POST https://api.intellibase.dev/api/v1/projects \
+  -H "Authorization: Bearer ib-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Document Search",
+    "vector_only": true
+  }'
+```
+
+```python Python
+import requests
+
+headers = {
+    "Authorization": "Bearer ib-your-api-key",
+    "Content-Type": "application/json"
+}
+
+# Create Vector-Only project
+response = requests.post(
+    "https://api.intellibase.dev/api/v1/projects",
+    headers=headers,
+    json={
+        "name": "Document Search",
+        "vector_only": True
+    }
+)
+
+project = response.json()
+print(f"Created project: {project['project_id']}")
+print(f"Mode: {project['mode']}")
+```
+
+```typescript TypeScript
+// Create KG+Vector project
+const response = await fetch(
+  "https://api.intellibase.dev/api/v1/projects",
+  {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer ib-your-api-key",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: "Engineering Knowledge Base",
+      ontology_id: "ont-abc123"
+    })
+  }
+);
+
+const project = await response.json();
+console.log(`Created project: ${project.project_id}`);
+console.log(`Mode: ${project.mode}`);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 Success (KG+Vector)
+{
+  "project_id": "proj-abc123",
+  "name": "Engineering Knowledge Base",
+  "mode": "kg_vector",
+  "created_at": "2024-01-15T10:30:00Z",
+  "ontology": {
+    "name": "Software Engineering",
+    "hierarchy": [ ... ],
+    "edge_types": [ ... ]
+  }
+}
+```
+
+```json 200 Success (Vector-Only)
+{
+  "project_id": "proj-xyz789",
+  "name": "Document Search",
+  "mode": "vector_only",
+  "created_at": "2024-01-15T10:30:00Z",
+  "ontology": null
+}
+```
+
+```json 400 Bad Request
+{
+  "detail": "Vector-only projects cannot specify an ontology"
+}
+```
+
+```json 404 Not Found
+{
+  "detail": "Ontology not found or not accessible"
+}
+```
+
+</ResponseExample>
+
+<Info>
+  **Save the `project_id`!** You'll need it for all ingestion and query operations.
+</Info>
+
+<Warning>
+  Projects **cannot change modes** after creation. Create a new project if you need a different mode.
+</Warning>
+

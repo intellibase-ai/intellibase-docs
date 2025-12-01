@@ -1,0 +1,220 @@
+---
+title: "Get Job"
+api: "GET /api/v1/projects/{project_id}/jobs/{job_id}"
+description: "Retrieve details and status of a specific ingestion job"
+---
+
+## Endpoint
+
+```
+GET https://api.intellibase.dev/api/v1/projects/{project_id}/jobs/{job_id}
+```
+
+## Path Parameters
+
+<ParamField path="project_id" type="string" required>
+  The unique identifier of the project
+</ParamField>
+
+<ParamField path="job_id" type="string" required>
+  The unique identifier of the job
+</ParamField>
+
+## Authentication
+
+Requires a valid API key with access to the project.
+
+## Response
+
+<ResponseField name="job_id" type="string">
+  Unique identifier for the job
+</ResponseField>
+
+<ResponseField name="project_id" type="string">
+  The project this job belongs to
+</ResponseField>
+
+<ResponseField name="source_doc_id" type="string">
+  The document identifier from the ingestion request
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Job status: `pending`, `running`, `completed`, or `failed`
+</ResponseField>
+
+<ResponseField name="chunks_processed" type="integer">
+  Number of text chunks processed
+</ResponseField>
+
+<ResponseField name="nodes_created" type="integer">
+  Number of entities created (0 for Vector-Only projects)
+</ResponseField>
+
+<ResponseField name="edges_created" type="integer">
+  Number of relationships created (0 for Vector-Only projects)
+</ResponseField>
+
+<ResponseField name="started_at" type="string" format="datetime">
+  When the job started processing
+</ResponseField>
+
+<ResponseField name="completed_at" type="string" format="datetime" optional>
+  When the job finished (null if still running or pending)
+</ResponseField>
+
+<ResponseField name="error_message" type="string" optional>
+  Error details if status is `failed`
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.intellibase.dev/api/v1/projects/proj-abc123/jobs/job-abc123 \
+  -H "Authorization: Bearer ib-your-api-key"
+```
+
+```python Python
+import requests
+
+project_id = "proj-abc123"
+job_id = "job-abc123"
+
+response = requests.get(
+    f"https://api.intellibase.dev/api/v1/projects/{project_id}/jobs/{job_id}",
+    headers={"Authorization": "Bearer ib-your-api-key"}
+)
+
+job = response.json()
+print(f"Job Status: {job['status']}")
+
+if job['status'] == 'completed':
+    print(f"✓ Processed: {job['chunks_processed']} chunks")
+    print(f"  Created: {job['nodes_created']} nodes, {job['edges_created']} edges")
+    duration = (
+        datetime.fromisoformat(job['completed_at'].replace('Z', '+00:00')) -
+        datetime.fromisoformat(job['started_at'].replace('Z', '+00:00'))
+    ).total_seconds()
+    print(f"  Duration: {duration:.1f}s")
+elif job['status'] == 'failed':
+    print(f"✗ Error: {job['error_message']}")
+elif job['status'] in ['pending', 'running']:
+    print(f"⏳ Job is {job['status']}...")
+```
+
+```typescript TypeScript
+const projectId = "proj-abc123";
+const jobId = "job-abc123";
+
+const response = await fetch(
+  `https://api.intellibase.dev/api/v1/projects/${projectId}/jobs/${jobId}`,
+  {
+    headers: {
+      "Authorization": "Bearer ib-your-api-key"
+    }
+  }
+);
+
+const job = await response.json();
+console.log(`Job Status: ${job.status}`);
+
+if (job.status === "completed") {
+  console.log(`✓ Processed: ${job.chunks_processed} chunks`);
+  console.log(`  Created: ${job.nodes_created} nodes, ${job.edges_created} edges`);
+  
+  const duration = (
+    new Date(job.completed_at).getTime() -
+    new Date(job.started_at).getTime()
+  ) / 1000;
+  console.log(`  Duration: ${duration.toFixed(1)}s`);
+} else if (job.status === "failed") {
+  console.error(`✗ Error: ${job.error_message}`);
+} else if (["pending", "running"].includes(job.status)) {
+  console.log(`⏳ Job is ${job.status}...`);
+}
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 Success (Completed)
+{
+  "job_id": "job-abc123",
+  "project_id": "proj-abc123",
+  "source_doc_id": "doc-001",
+  "status": "completed",
+  "chunks_processed": 12,
+  "nodes_created": 8,
+  "edges_created": 15,
+  "started_at": "2024-01-15T10:30:00Z",
+  "completed_at": "2024-01-15T10:30:15Z",
+  "error_message": null
+}
+```
+
+```json 200 Success (Running)
+{
+  "job_id": "job-def456",
+  "project_id": "proj-abc123",
+  "source_doc_id": "doc-002",
+  "status": "running",
+  "chunks_processed": 0,
+  "nodes_created": 0,
+  "edges_created": 0,
+  "started_at": "2024-01-15T10:29:00Z",
+  "completed_at": null,
+  "error_message": null
+}
+```
+
+```json 200 Success (Failed)
+{
+  "job_id": "job-ghi789",
+  "project_id": "proj-abc123",
+  "source_doc_id": "doc-003",
+  "status": "failed",
+  "chunks_processed": 5,
+  "nodes_created": 3,
+  "edges_created": 2,
+  "started_at": "2024-01-15T10:28:00Z",
+  "completed_at": "2024-01-15T10:28:10Z",
+  "error_message": "LLM API timeout after 3 retries"
+}
+```
+
+```json 404 Not Found
+{
+  "detail": "Job not found"
+}
+```
+
+</ResponseExample>
+
+<Info>
+  **Poll this endpoint** to monitor ingestion progress after submitting via [Ingest Text](/api-reference/ingestion/ingest).
+</Info>
+
+<Tip>
+  **Recommended polling interval**: 2-5 seconds for async jobs.
+  
+  For synchronous ingestion, the job is complete when the ingest endpoint returns.
+</Tip>
+
+## Job Statuses
+
+| Status | Description | Next Action |
+|--------|-------------|-------------|
+| `pending` | Job queued, waiting to start | Keep polling |
+| `running` | Job is being processed | Keep polling |
+| `completed` | Job finished successfully | Data is ready to query |
+| `failed` | Job failed with an error | Check `error_message`, fix issue, retry |
+
+## Common Errors
+
+| Error Message | Cause | Solution |
+|---------------|-------|----------|
+| `LLM API timeout after 3 retries` | LLM service unavailable | Retry ingestion |
+| `Invalid extraction: missing required properties` | Malformed LLM response | Retry, or report if persists |
+| `Database connection lost` | Temporary connection issue | Retry ingestion |
+| `Token usage limit exceeded` | Account token limit reached | Upgrade plan or wait for reset |
+

@@ -1,80 +1,267 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get started with Intellibase in 5 minutes"
 ---
 
-## Get started in three steps
+This guide will walk you through creating your first Intellibase project, ingesting data, and querying it.
 
-Get your documentation site running locally and make your first customization.
+## Step 1: Get Your API Key
 
-### Step 1: Set up your local environment
+To use Intellibase, you need an API key:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+1. Log in to the [Intellibase Dashboard](https://app.intellibase.dev)
+2. Navigate to **API Keys**
+3. Click **Create API Key**
+4. Copy your key (it starts with `ib-`)
+
+<Warning>
+  Store your API key securely. It provides full access to your projects and data.
+</Warning>
+
+## Step 2: Create a new Project
+
+Intellibase offers two project modes:
+
+<Tabs>
+  <Tab title="KG + Vector Mode">
+    **Best for**: Capturing complex multi-hop relationships, hierarchal understanding, temporal reasoning and high accuracy.
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    **Optionally define your custom ontology** - You can define a custom ontology for your knowledge graph (with help from AI) so that you get
+    a highly dependable graph that captures all the information that is important to your agent without any unnecessary noise.
+
+    <Tabs>
+      <Tab title="Custom/ Static Ontology">
+          1. Use the [suggest ontology endpoint](/api-reference/ontologies/suggest) to get a suggested ontology by describing the use case or agent persona, optionally 
+          sample expected input/ ouput that the agent will be expected to perform.
+
+          ```bash
+          # Let AI suggest an ontology based on your use case
+          curl -X POST https://api.intellibase.dev/api/v1/ontologies/suggest \
+            -H "Authorization: Bearer ib-your-api-key" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "usecase": "Track software engineering projects, developers, and features"
+            }'
+          ```
+
+          2. Use the [create ontology endpoint](/api-reference/ontologies/create) to save the ontology into Intellibase and generate an ontology ID.
+
+          ```bash cURL
+          curl -X POST https://api.intellibase.dev/api/v1/ontologies \
+            -H "Authorization: Bearer ib-your-api-key" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "Software Engineering",
+              "schema": {
+                "ontology": {
+                  "hierarchy": [
+                    {
+                      "level": 0,
+                      "node_types": {
+                        "Developer": {
+                          "properties": ["name", "role", "team"],
+                          "description": "Software developer"
+                        },
+                        "Feature": {
+                          "properties": ["name", "status", "deadline"],
+                          "description": "Software feature"
+                        }
+                      }
+                    }
+                  ],
+                  "edge_types": [
+                    {
+                      "name": "WORKS_ON",
+                      "source_types": ["Developer"],
+                      "target_types": ["Feature"],
+                      "properties": ["role"],
+                      "temporal": true,
+                      "description": "Developer works on feature"
+                    }
+                  ]
+                }
+              }
+            }'
+          ```
+          
+          3. Then create your project with the ontology ID you got from the previous step:
+          
+          ```bash
+          curl -X POST https://api.intellibase.dev/api/v1/projects \
+            -H "Authorization: Bearer ib-your-api-key" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "Engineering Knowledge Base",
+              "ontology_id": "ba879....",
+            }'
+          ```
+      </Tab>
+      <Tab title="Dynamic Ontology">
+          Create a project by providing a name. If you don't provide an ontology ID during project creation,
+          the knowledge graph generated will not have a fixed/ static ontology and will be generated based on 
+          the data being ingested into the engine.
+          
+          ```bash
+          curl -X POST https://api.intellibase.dev/api/v1/projects \
+            -H "Authorization: Bearer ib-your-api-key" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "Engineering Knowledge Base",
+              "ontology_id": "ba879....",
+            }'
+          ```
+      </Tab>
+    </Tabs>
+  </Tab>
+  <Tab title="Vector-Only Mode">
+    **Best for**: Traditional RAG, semantic search, getting started quickly
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    **No ontology required** - just ingest and query!
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    curl -X POST https://api.intellibase.dev/api/v1/projects \
+      -H "Authorization: Bearer ib-your-api-key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "My First Project",
+        "vector_only": true
+      }'
+    ```
+  </Tab>
+</Tabs>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Info>
+  Save the `project_id` from the response - you'll need it for all subsequent operations.
+</Info>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+## Step 3: Ingest data into your project
 
-### Step 3: Go live
+Now let's add some data to your project. We currently only support text input, we'll soon be adding support for more input data types.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+```bash
+curl -X POST https://api.intellibase.dev/api/v1/projects/{project_id}/ingest \
+  -H "Authorization: Bearer ib-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Alice joined the engineering team in January 2024. She is working on the authentication feature, which is part of the security module. The feature is scheduled to launch in March 2024.",
+    "source_doc_id": "doc-001",
+  }'
+```
 
-## Next steps
+The API returns a job ID:
 
-Now that you have your docs running, explore these key features:
+```json
+{
+  "job_id": "job-abc123",
+  "status": "pending",
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
 
-<CardGroup cols={2}>
+## Step 4: Check Ingestion Status
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+Monitor your ingestion job:
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+```bash
+curl https://api.intellibase.dev/api/v1/projects/{project_id}/jobs/{job_id} \
+  -H "Authorization: Bearer ib-your-api-key"
+```
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+Response:
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+```json
+{
+  "job_id": "job-abc123",
+  "project_id": "proj-xyz",
+  "status": "completed",
+  "chunks_processed": 3,
+  "nodes_created": 5,
+  "edges_created": 4,
+  "started_at": "2024-01-15T10:30:00Z",
+  "completed_at": "2024-01-15T10:30:15Z"
+}
+```
 
-</CardGroup>
+<Check>
+  When `status` is `completed`, your data is ready to query!
+</Check>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Step 5: Query Your Data
+
+Ask natural language questions to fetch the most relevant nodes, edges and chunks.
+
+<Tabs>
+  <Tab title="Static Mode (Fast)">
+
+    The static query mode is designed for low latency and does not use AI during retrieval. 
+    The results are still of very high quality and better than a basic vanilla vector RAG system.
+
+    ```bash
+    curl -X POST https://api.intellibase.dev/api/v1/projects/{project_id}/query \
+      -H "Authorization: Bearer ib-your-api-key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "query": "What features is Alice working on?",
+        "mode": "static"
+      }'
+    ```
+  </Tab>
+  <Tab title="Dynamic Mode (Intelligent)">
+
+    The dynamic query mode is designed for high accuracy with a slight trade-off in terms of latency. 
+    It uses AI to retrive the most relevant information from the context engine.
+
+    ```bash
+    curl -X POST https://api.intellibase.dev/api/v1/projects/{project_id}/query \
+      -H "Authorization: Bearer ib-your-api-key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "query": "What features is Alice working on?",
+        "mode": "dynamic"
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+Response:
+
+```json
+{
+  "query": "What features is Alice working on?",
+  "strategy_used": "hybrid",
+  "results": {
+    "summary": "Alice is working on the authentication feature, which is part of the security module and scheduled to launch in March 2024.",
+    "entities": [
+      {
+        "type": "Person",
+        "name": "Alice",
+        "properties": {
+          "role": "Engineer",
+          "joined": "January 2024"
+        }
+      },
+      {
+        "type": "Feature",
+        "name": "Authentication Feature",
+        "properties": {
+          "module": "Security",
+          "launch_date": "March 2024"
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "source": "Alice",
+        "target": "Authentication Feature",
+        "type": "WORKS_ON"
+      }
+    ],
+    "chunks": [
+      {
+        "text": "She is working on the authentication feature...",
+        "similarity": 0.89
+      }
+    ]
+  }
+}
+```

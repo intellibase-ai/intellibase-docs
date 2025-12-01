@@ -1,0 +1,288 @@
+---
+title: "Query Project"
+api: "POST /api/v1/projects/{project_id}/query"
+description: "Query your knowledge base with natural language questions"
+---
+
+## Endpoint
+
+```
+POST https://api.intellibase.dev/api/v1/projects/{project_id}/query
+```
+
+## Path Parameters
+
+<ParamField path="project_id" type="string" required>
+  The unique identifier of the project to query
+</ParamField>
+
+## Authentication
+
+Requires a valid API key with access to the project.
+
+## Request Body
+
+<ParamField body="query" type="string" required>
+  Natural language question to ask about your data
+</ParamField>
+
+<ParamField body="mode" type="string" default="static">
+  Query mode:
+  - `static`: Fast, deterministic single-pass retrieval (recommended)
+  - `dynamic`: Slower, agentic multi-step reasoning
+</ParamField>
+
+## Response
+
+<ResponseField name="query" type="string">
+  The original query string
+</ResponseField>
+
+<ResponseField name="strategy_used" type="string">
+  Retrieval strategy selected: `kg`, `vector`, or `hybrid` (always `vector` for Vector-Only projects)
+</ResponseField>
+
+<ResponseField name="results" type="object">
+  Query results
+  
+  <Expandable title="Results Object">
+    <ResponseField name="results.summary" type="string">
+      Natural language summary of findings
+    </ResponseField>
+    
+    <ResponseField name="results.entities" type="array">
+      Array of entities retrieved from knowledge graph (empty for Vector-Only)
+    </ResponseField>
+    
+    <ResponseField name="results.relationships" type="array">
+      Array of relationships retrieved from knowledge graph (empty for Vector-Only)
+    </ResponseField>
+    
+    <ResponseField name="results.chunks" type="array">
+      Array of text chunks retrieved via vector search
+    </ResponseField>
+    
+    <ResponseField name="results.metadata" type="object">
+      Execution metadata (counts, timing, etc.)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL (Simple)
+curl -X POST https://api.intellibase.dev/api/v1/projects/proj-abc123/query \
+  -H "Authorization: Bearer ib-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What features is Alice working on?"
+  }'
+```
+
+```python Python
+import requests
+
+project_id = "proj-abc123"
+headers = {
+    "Authorization": "Bearer ib-your-api-key",
+    "Content-Type": "application/json"
+}
+
+# Simple query
+response = requests.post(
+    f"https://api.intellibase.dev/api/v1/projects/{project_id}/query",
+    headers=headers,
+    json={
+        "query": "What features is Alice working on?",
+        "mode": "static"
+    }
+)
+
+result = response.json()
+print(f"Strategy: {result['strategy_used']}")
+print(f"Summary: {result['results']['summary']}")
+
+# Show entities
+for entity in result['results']['entities']:
+    print(f"- {entity['type']}: {entity['name']}")
+
+# Show relationships
+for rel in result['results']['relationships']:
+    print(f"- {rel['source']} -{rel['type']}-> {rel['target']}")
+
+# Show chunks
+for chunk in result['results']['chunks']:
+    print(f"- [{chunk['similarity']:.2f}] {chunk['text'][:100]}...")
+```
+
+```typescript TypeScript
+const projectId = "proj-abc123";
+
+const response = await fetch(
+  `https://api.intellibase.dev/api/v1/projects/${projectId}/query`,
+  {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer ib-your-api-key",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      query: "What features is Alice working on?",
+      mode: "static"
+    })
+  }
+);
+
+const result = await response.json();
+console.log(`Strategy: ${result.strategy_used}`);
+console.log(`Summary: ${result.results.summary}`);
+
+// Show entities
+result.results.entities.forEach(entity => {
+  console.log(`- ${entity.type}: ${entity.name}`);
+});
+
+// Show relationships
+result.results.relationships.forEach(rel => {
+  console.log(`- ${rel.source} -${rel.type}-> ${rel.target}`);
+});
+
+// Show chunks
+result.results.chunks.forEach(chunk => {
+  console.log(`- [${chunk.similarity.toFixed(2)}] ${chunk.text.substring(0, 100)}...`);
+});
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 Success (Hybrid Strategy)
+{
+  "query": "What features is Alice working on?",
+  "strategy_used": "hybrid",
+  "results": {
+    "summary": "Alice is working on the authentication feature, which is part of the security module and scheduled to launch in March 2024.",
+    "entities": [
+      {
+        "id": "node-123",
+        "type": "Developer",
+        "name": "Alice",
+        "properties": {
+          "role": "Senior Engineer",
+          "team": "Backend"
+        },
+        "abstraction_level": 0
+      },
+      {
+        "id": "node-456",
+        "type": "Feature",
+        "name": "Authentication Feature",
+        "properties": {
+          "status": "in_progress",
+          "deadline": "2024-03-31"
+        },
+        "abstraction_level": 0
+      }
+    ],
+    "relationships": [
+      {
+        "id": "edge-789",
+        "source": "Alice",
+        "target": "Authentication Feature",
+        "type": "WORKS_ON",
+        "properties": {
+          "role": "lead"
+        },
+        "temporal": {
+          "real_world_valid_from": "2024-01-15T00:00:00Z"
+        }
+      }
+    ],
+    "chunks": [
+      {
+        "id": "chunk-001",
+        "text": "Alice joined the engineering team in January 2024. She is working on the authentication feature...",
+        "similarity": 0.89,
+        "source_doc_id": "doc-001",
+        "metadata": {
+          "title": "Team Update"
+        },
+        "linked_entities": ["node-123", "node-456"]
+      }
+    ],
+    "metadata": {
+      "total_nodes": 2,
+      "total_edges": 1,
+      "total_chunks": 1,
+      "execution_time_ms": 245
+    }
+  }
+}
+```
+
+```json 200 Success (Vector-Only)
+{
+  "query": "What does the document say about Alice?",
+  "strategy_used": "vector",
+  "results": {
+    "summary": "Alice joined the engineering team in January 2024 and is working on the authentication feature.",
+    "entities": [],
+    "relationships": [],
+    "chunks": [
+      {
+        "id": "chunk-001",
+        "text": "Alice joined the engineering team in January 2024. She is working on the authentication feature...",
+        "similarity": 0.92,
+        "source_doc_id": "doc-001",
+        "metadata": {
+          "title": "Team Update"
+        }
+      },
+      {
+        "id": "chunk-002",
+        "text": "The authentication feature, led by Alice, is a critical security component...",
+        "similarity": 0.78,
+        "source_doc_id": "doc-002",
+        "metadata": {
+          "title": "Security Roadmap"
+        }
+      }
+    ],
+    "metadata": {
+      "total_nodes": 0,
+      "total_edges": 0,
+      "total_chunks": 2,
+      "execution_time_ms": 180
+    }
+  }
+}
+```
+
+```json 404 Not Found
+{
+  "detail": "Project proj-invalid not found"
+}
+```
+
+```json 403 Forbidden
+{
+  "detail": "Token usage limit exceeded"
+}
+```
+
+```json 429 Too Many Requests
+{
+  "detail": "Rate limit exceeded. Try again in 60 seconds."
+}
+```
+
+</ResponseExample>
+
+<Tip>
+  **Start with Static Mode** for most queries. Use Dynamic Mode only for complex, multi-hop questions that require agentic reasoning.
+</Tip>
+
+<Warning>
+  **Rate Limits**: Queries are limited to 30 requests per minute. Also check your token usage limits.
+</Warning>

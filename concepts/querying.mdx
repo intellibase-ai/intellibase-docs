@@ -1,0 +1,677 @@
+---
+title: "Querying"
+description: "Learn how to query your knowledge base with static and dynamic modes"
+---
+
+## Overview
+
+Intellibase provides intelligent query orchestration that adapts to your project mode and query requirements. Ask natural language questions and get structured, contextual answers.
+
+## Query Modes
+
+Intellibase supports two query modes that control how queries are processed:
+
+<Tabs>
+  <Tab title="Static Mode (Recommended)">
+    ### Static Mode
+    
+    **Single-pass, deterministic retrieval with low latency**
+    
+    <Check>
+      **Best for:**
+      - Production applications
+      - Predictable performance
+      - Cost-sensitive workloads
+      - Real-time responses
+    </Check>
+    
+    #### How It Works
+    
+    ```mermaid
+    graph LR
+        A[Query] --> B[Classify Strategy]
+        B --> C[Plan Retrieval]
+        C --> D[Execute Retrieval]
+        D --> E[Format Results]
+        E --> F[Return]
+    ```
+    
+    **Single Pass**:
+    1. **Classify**: Determine if KG, vector, or hybrid retrieval
+    2. **Plan**: Generate retrieval plan (graph traversal or vector search)
+    3. **Retrieve**: Execute against databases
+    4. **Format**: Structure results for response
+    
+    **Characteristics:**
+    - ✅ Low latency (< 3 seconds typical)
+    - ✅ Predictable cost (1-2 LLM calls)
+    - ✅ Consistent performance
+    - ✅ Production-ready
+    - ❌ Less adaptive to complex queries
+    
+    **Example:**
+    
+    ```bash
+    curl -X POST https://api.intellibase.dev/api/v1/projects/{project_id}/query \
+      -H "Authorization: Bearer ib-your-api-key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "query": "What features is Alice working on?",
+        "mode": "static"
+      }'
+    ```
+  </Tab>
+  
+  <Tab title="Dynamic Mode (Advanced)">
+    ### Dynamic Mode
+    
+    **Multi-step, agentic reasoning with adaptive strategies**
+    
+    <Check>
+      **Best for:**
+      - Complex, exploratory queries
+      - Research and analysis
+      - When accuracy > speed
+      - Intelligent refinement needed
+    </Check>
+    
+    #### How It Works
+    
+    ```mermaid
+    graph TB
+        A[Query] --> B[Analyze Intent]
+        B --> C[Plan Strategy]
+        C --> D[Execute Step 1]
+        D --> E{Sufficient?}
+        E -->|No| F[Refine Plan]
+        F --> G[Execute Step 2]
+        G --> E
+        E -->|Yes| H[Synthesize]
+        H --> I[Return]
+    ```
+    
+    **Multi-Pass Agentic Flow**:
+    1. **Analyze**: Deep understanding of query intent
+    2. **Plan**: Create multi-step retrieval strategy
+    3. **Execute**: Run first retrieval step
+    4. **Evaluate**: LLM determines if results are sufficient
+    5. **Refine**: Adjust plan based on initial results
+    6. **Iterate**: Repeat until sufficient or max steps
+    7. **Synthesize**: Combine all results intelligently
+    
+    **Characteristics:**
+    - ✅ Intelligent query refinement
+    - ✅ Handles complex queries well
+    - ✅ Adaptive retrieval strategies
+    - ✅ Higher accuracy
+    - ❌ Higher latency (5-15 seconds)
+    - ❌ More expensive (5-10+ LLM calls)
+    - ❌ Variable performance
+    
+    **Example:**
+    
+    ```bash
+    curl -X POST https://api.intellibase.dev/api/v1/projects/{project_id}/query \
+      -H "Authorization: Bearer ib-your-api-key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "query": "How have Alice'\''s responsibilities evolved over time and what relationships exist between her current projects?",
+        "mode": "dynamic"
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Query Strategies
+
+Based on your project mode and query, Intellibase automatically selects a retrieval strategy:
+
+### For Vector-Only Projects
+
+<Card>
+  **Vector-Only Strategy**
+  
+  All queries use semantic vector search regardless of mode:
+  1. Embed the query
+  2. Similarity search in vector DB
+  3. Return top-k chunks
+  
+  Simple and fast!
+</Card>
+
+### For KG+Vector Projects
+
+The query orchestrator intelligently selects from three strategies:
+
+<Tabs>
+  <Tab title="KG-Only">
+    ### Knowledge Graph Only
+    
+    **When to use**: Queries about relationships, hierarchies, connections
+    
+    **Examples:**
+    - "How are Alice and Bob connected?"
+    - "Show me the team structure"
+    - "What features depend on Feature-X?"
+    - "Who reports to the Engineering Manager?"
+    
+    **How it works:**
+    1. Parse query to identify entities and relationship patterns
+    2. Generate graph traversal plan (Cypher/AQL query)
+    3. Execute against graph database
+    4. Return subgraph or paths
+    
+    **Returns:**
+    ```json
+    {
+      "strategy_used": "kg",
+      "results": {
+        "summary": "Alice and Bob are both part of the Engineering Team...",
+        "entities": [
+          {"type": "Developer", "name": "Alice", ...},
+          {"type": "Developer", "name": "Bob", ...}
+        ],
+        "relationships": [
+          {"source": "Alice", "target": "Team", "type": "BELONGS_TO"}
+        ]
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Vector-Only">
+    ### Vector Search Only
+    
+    **When to use**: Queries requiring direct text evidence
+    
+    **Examples:**
+    - "What does the document say about Alice?"
+    - "Find quotes about the security feature"
+    - "Summarize the meeting notes"
+    - "What information exists about Project Alpha?"
+    
+    **How it works:**
+    1. Embed the query
+    2. Similarity search in vector DB
+    3. Retrieve top-k chunks
+    4. Rank by relevance
+    
+    **Returns:**
+    ```json
+    {
+      "strategy_used": "vector",
+      "results": {
+        "summary": "Alice is mentioned in the context of...",
+        "chunks": [
+          {
+            "text": "Alice joined the engineering team in January...",
+            "similarity": 0.89,
+            "source_doc_id": "doc-001",
+            "metadata": {...}
+          }
+        ]
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Hybrid">
+    ### Hybrid (KG + Vector)
+    
+    **When to use**: Queries benefiting from both structure and content
+    
+    **Examples:**
+    - "What documents discuss Alice's projects?"
+    - "Find information about features related to security"
+    - "What has been written about the Engineering Team?"
+    - "Show me content connected to Feature-X"
+    
+    **How it works:**
+    1. Execute graph traversal to find relevant entities
+    2. Execute vector search for query
+    3. Find chunks linked to retrieved entities
+    4. Boost chunks appearing in both results
+    5. Merge and rank all results
+    
+    **Returns:**
+    ```json
+    {
+      "strategy_used": "hybrid",
+      "results": {
+        "summary": "Alice is working on Feature-X, which is part of...",
+        "entities": [
+          {"type": "Developer", "name": "Alice", ...}
+        ],
+        "relationships": [
+          {"source": "Alice", "target": "Feature-X", "type": "WORKS_ON"}
+        ],
+        "chunks": [
+          {
+            "text": "Feature-X is a critical security component...",
+            "similarity": 0.91,
+            "linked_entities": ["Feature-X"]
+          }
+        ]
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Making a Query
+
+### Basic Query
+
+```bash
+curl -X POST https://api.intellibase.dev/api/v1/projects/{project_id}/query \
+  -H "Authorization: Bearer ib-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is Alice working on?"
+  }'
+```
+
+**Default**: Static mode, auto strategy selection, standard options
+
+### With Options
+
+```bash
+curl -X POST https://api.intellibase.dev/api/v1/projects/{project_id}/query \
+  -H "Authorization: Bearer ib-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is Alice working on?",
+    "mode": "static",
+    "options": {
+      "top_k": 20,
+      "max_depth": 3,
+      "temporal_filter": {
+        "valid_from": "2024-01-01T00:00:00Z",
+        "valid_to": "2024-12-31T23:59:59Z"
+      }
+    }
+  }'
+```
+
+## Query Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `mode` | string | `"static"` | Query mode: `"static"` or `"dynamic"` |
+| `options.top_k` | integer | `10` | Number of vector search results to return |
+| `options.max_depth` | integer | `3` | Maximum graph traversal depth (KG queries) |
+| `options.temporal_filter` | object | `null` | Filter by temporal validity (KG mode) |
+
+### Temporal Filtering (KG Mode)
+
+Query for entities/relationships valid during a time range:
+
+```json
+{
+  "query": "Who was working on Feature-X?",
+  "options": {
+    "temporal_filter": {
+      "valid_from": "2024-01-01T00:00:00Z",
+      "valid_to": "2024-03-31T23:59:59Z"
+    }
+  }
+}
+```
+
+This returns only relationships that were valid (at least partially) during Q1 2024.
+
+## Response Format
+
+All queries return a consistent response structure:
+
+```json
+{
+  "query": "What is Alice working on?",
+  "strategy_used": "hybrid",
+  "results": {
+    "summary": "Natural language summary of findings",
+    "entities": [
+      {
+        "id": "node-123",
+        "type": "Developer",
+        "name": "Alice",
+        "properties": {
+          "role": "Senior Engineer",
+          "team": "Backend"
+        },
+        "abstraction_level": 0
+      }
+    ],
+    "relationships": [
+      {
+        "id": "edge-456",
+        "source": "Alice",
+        "target": "Feature-X",
+        "type": "WORKS_ON",
+        "properties": {},
+        "temporal": {
+          "real_world_valid_from": "2024-01-15T00:00:00Z"
+        }
+      }
+    ],
+    "chunks": [
+      {
+        "id": "chunk-789",
+        "text": "Alice has been working on Feature-X since January...",
+        "similarity": 0.89,
+        "source_doc_id": "doc-001",
+        "metadata": {"title": "Team Update"},
+        "linked_entities": ["node-123"]
+      }
+    ],
+    "metadata": {
+      "total_nodes": 2,
+      "total_edges": 1,
+      "total_chunks": 5,
+      "execution_time_ms": 245
+    }
+  }
+}
+```
+
+### Response Fields
+
+<AccordionGroup>
+  <Accordion title="query">
+    The original query string submitted.
+  </Accordion>
+  
+  <Accordion title="strategy_used">
+    The retrieval strategy selected: `"kg"`, `"vector"`, or `"hybrid"`.
+    
+    For Vector-Only projects, this is always `"vector"`.
+  </Accordion>
+  
+  <Accordion title="results.summary">
+    Natural language summary synthesized from all retrieved information.
+  </Accordion>
+  
+  <Accordion title="results.entities">
+    Array of entities (nodes) retrieved from the knowledge graph.
+    
+    Empty for Vector-Only projects or vector-only strategy queries.
+  </Accordion>
+  
+  <Accordion title="results.relationships">
+    Array of relationships (edges) between entities.
+    
+    Empty for Vector-Only projects or vector-only strategy queries.
+  </Accordion>
+  
+  <Accordion title="results.chunks">
+    Array of text chunks retrieved from vector search, ranked by similarity.
+  </Accordion>
+  
+  <Accordion title="results.metadata">
+    Query execution metadata including counts and timing.
+  </Accordion>
+</AccordionGroup>
+
+## Query Best Practices
+
+<AccordionGroup>
+  <Accordion title="Be Specific">
+    More specific queries get better results:
+    
+    ✅ Good:
+    - "What security features is Alice working on?"
+    - "How are Feature-X and Feature-Y related?"
+    - "Who joined the engineering team in January 2024?"
+    
+    ❌ Too vague:
+    - "What's happening?"
+    - "Tell me about Alice"
+    - "Features"
+  </Accordion>
+  
+  <Accordion title="Use Natural Language">
+    Write queries as natural questions:
+    
+    ✅ Good:
+    - "What projects is Alice involved in?"
+    - "Show me features related to authentication"
+    
+    ❌ Keyword searches:
+    - "Alice projects"
+    - "authentication features"
+  </Accordion>
+  
+  <Accordion title="Leverage Graph Structure (KG Mode)">
+    Ask about relationships and connections:
+    
+    ✅ Graph-friendly:
+    - "How are Alice and Bob connected?"
+    - "What features depend on the database module?"
+    - "Who reports to the VP of Engineering?"
+    
+    These work best with KG mode!
+  </Accordion>
+  
+  <Accordion title="Use Temporal Queries (KG Mode)">
+    Include temporal context when relevant:
+    
+    ```json
+    {
+      "query": "Who was working on Feature-X in Q1 2024?",
+      "options": {
+        "temporal_filter": {
+          "valid_from": "2024-01-01T00:00:00Z",
+          "valid_to": "2024-03-31T23:59:59Z"
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Choose the Right Mode">
+    - **Static mode**: Most queries, production use
+    - **Dynamic mode**: Complex multi-hop questions, exploratory analysis
+    
+    Start with static; use dynamic only when needed.
+  </Accordion>
+</AccordionGroup>
+
+## Performance Optimization
+
+### Query Latency
+
+**Typical response times:**
+
+| Mode | Strategy | Latency |
+|------|----------|---------|
+| Static | Vector-Only | < 500ms |
+| Static | KG-Only | 1-2s |
+| Static | Hybrid | 2-3s |
+| Dynamic | Any | 5-15s |
+
+### Optimization Tips
+
+<CardGroup cols={2}>
+  <Card
+    title="Use Static Mode"
+    icon="bolt"
+  >
+    Static mode is 3-5x faster than dynamic
+  </Card>
+  <Card
+    title="Limit top_k"
+    icon="filter"
+  >
+    Fewer results = faster processing
+  </Card>
+  <Card
+    title="Reduce max_depth"
+    icon="diagram-project"
+  >
+    Shallow traversals are faster
+  </Card>
+  <Card
+    title="Cache Results"
+    icon="database"
+  >
+    Cache common queries on your side
+  </Card>
+</CardGroup>
+
+## Code Examples
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    import requests
+    
+    API_KEY = "ib-your-api-key"
+    BASE_URL = "https://api.intellibase.dev/api/v1"
+    PROJECT_ID = "proj-123"
+    
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    # Simple query
+    response = requests.post(
+        f"{BASE_URL}/projects/{PROJECT_ID}/query",
+        headers=headers,
+        json={
+            "query": "What is Alice working on?",
+            "mode": "static"
+        }
+    )
+    
+    result = response.json()
+    print(result["results"]["summary"])
+    
+    # Show entities
+    for entity in result["results"]["entities"]:
+        print(f"- {entity['type']}: {entity['name']}")
+    
+    # Show relationships
+    for rel in result["results"]["relationships"]:
+        print(f"- {rel['source']} -{rel['type']}-> {rel['target']}")
+    ```
+  </Tab>
+  
+  <Tab title="TypeScript">
+    ```typescript
+    const API_KEY = "ib-your-api-key";
+    const BASE_URL = "https://api.intellibase.dev/api/v1";
+    const PROJECT_ID = "proj-123";
+    
+    const headers = {
+      "Authorization": `Bearer ${API_KEY}`,
+      "Content-Type": "application/json"
+    };
+    
+    // Simple query
+    const response = await fetch(
+      `${BASE_URL}/projects/${PROJECT_ID}/query`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          query: "What is Alice working on?",
+          mode: "static"
+        })
+      }
+    );
+    
+    const result = await response.json();
+    console.log(result.results.summary);
+    
+    // Show entities
+    result.results.entities.forEach(entity => {
+      console.log(`- ${entity.type}: ${entity.name}`);
+    });
+    
+    // Show relationships
+    result.results.relationships.forEach(rel => {
+      console.log(`- ${rel.source} -${rel.type}-> ${rel.target}`);
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Common Query Patterns
+
+### Entity-Centric Queries
+
+Focus on a specific entity:
+
+```json
+{
+  "query": "Tell me everything about Alice",
+  "mode": "static"
+}
+```
+
+Returns: Entity details, relationships, and relevant content chunks.
+
+### Relationship Queries
+
+Explore connections:
+
+```json
+{
+  "query": "How are Feature-X and Feature-Y related?",
+  "mode": "static"
+}
+```
+
+Returns: Graph path between features, shared entities, dependencies.
+
+### Temporal Queries
+
+Track evolution over time:
+
+```json
+{
+  "query": "How has Alice's role changed over time?",
+  "mode": "dynamic",
+  "options": {
+    "temporal_filter": {
+      "valid_from": "2023-01-01T00:00:00Z"
+    }
+  }
+}
+```
+
+Returns: Historical relationships with temporal validity.
+
+### Content Discovery
+
+Find relevant documents:
+
+```json
+{
+  "query": "What documents discuss authentication security?",
+  "mode": "static"
+}
+```
+
+Returns: Chunks with high similarity + linked entities.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Query API Reference"
+    icon="code"
+    href="/api-reference/query/query"
+  >
+    View the complete API specification
+  </Card>
+  <Card
+    title="Ingest More Data"
+    icon="upload"
+    href="/concepts/ingestion"
+  >
+    Add more knowledge to improve query results
+  </Card>
+</CardGroup>
+

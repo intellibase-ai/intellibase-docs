@@ -1,0 +1,460 @@
+---
+title: "Ontologies"
+description: "Design custom ontologies for knowledge graph construction"
+---
+
+## What is an Ontology?
+
+An **ontology** is a formal specification that defines:
+- **Entity types** (nodes): What kinds of things exist in your domain
+- **Relationship types** (edges): How entities can connect
+- **Hierarchies**: How concepts organize from concrete to abstract
+- **Properties**: What attributes each type can have
+
+Ontologies are **required for KG+Vector projects** and enable Intellibase to extract structured knowledge from unstructured text.
+
+<Info>
+  **Vector-Only projects** don't require an ontology. They only use semantic search without knowledge graph construction.
+</Info>
+
+## Static vs Dynamic Ontology
+
+Intellibase supports two ontology approaches:
+
+<Tabs>
+  <Tab title="Static Ontology (Recommended)">
+    ### Static Ontology
+    
+    **You define the ontology upfront with specific node and edge types**
+    
+    <Check>
+      **Best for:**
+      - Well-defined domains
+      - Consistent data structures
+      - Production applications
+      - When you know your domain model
+    </Check>
+    
+    #### How It Works
+    
+    You create an ontology that specifies:
+    1. Exact node types at each abstraction level
+    2. Valid relationship types
+    3. Properties for each type
+    4. Hierarchical structure
+    
+    During ingestion, Intellibase:
+    - Extracts **only** the node types you defined
+    - Creates **only** the relationship types you specified
+    - Builds hierarchy according to your structure
+    - Validates data against your schema
+    
+    #### Example: Software Engineering Ontology
+    
+    ```yaml
+    ontology:
+      name: "Software Engineering"
+      hierarchy:
+        - level: 0  # Concrete entities
+          node_types:
+            Developer:
+              properties: [name, role, team]
+              description: "Individual software developer"
+            Feature:
+              properties: [name, status, deadline]
+              description: "Specific feature or task"
+            Repository:
+              properties: [name, language, url]
+              description: "Code repository"
+        
+        - level: 1  # Mid-level abstractions
+          node_types:
+            Team:
+              aggregates: [Developer]
+              properties: [name, focus_area]
+              description: "Group of developers"
+            Project:
+              aggregates: [Feature, Repository]
+              properties: [name, status]
+              description: "Software project"
+        
+        - level: 2  # High-level concepts
+          node_types:
+            Department:
+              aggregates: [Team]
+              properties: [name, mission]
+              description: "Engineering department"
+      
+      edge_types:
+        - WORKS_ON:
+            source_types: [Developer]
+            target_types: [Feature]
+            properties: [role, started_date]
+            temporal: true
+        - BELONGS_TO:
+            source_types: [Developer]
+            target_types: [Team]
+            properties: [joined_date]
+            temporal: true
+        - DEPENDS_ON:
+            source_types: [Feature]
+            target_types: [Feature]
+            properties: [dependency_type]
+            temporal: false
+    ```
+    
+    #### Benefits
+    
+    - ✅ Predictable structure
+    - ✅ Type safety and validation
+    - ✅ Consistent extractions
+    - ✅ Better for production
+    - ✅ Easier to query
+  </Tab>
+  
+  <Tab title="Dynamic Ontology">
+    ### Dynamic Ontology
+    
+    **KG+Vector project without a predefined ontology - entities emerge from data**
+    
+    <Warning>
+      This is **not yet supported** in Intellibase. Currently, to use KG+Vector mode, you must provide a static ontology.
+    </Warning>
+    
+    #### Planned Behavior (Coming Soon)
+    
+    In dynamic mode, Intellibase would:
+    - Let the LLM infer entity types from context
+    - Discover relationships organically
+    - Build hierarchy based on semantic similarity
+    - Evolve the schema over time
+    
+    <Check>
+      **Best for (when available):**
+      - Exploratory analysis
+      - Unknown or evolving domains
+      - Prototyping
+      - Research projects
+    </Check>
+    
+    #### Trade-offs
+    
+    - ✅ No upfront ontology design
+    - ✅ Flexible and adaptive
+    - ✅ Discovers unexpected patterns
+    - ❌ Less predictable structure
+    - ❌ Harder to query consistently
+    - ❌ May create duplicate types
+  </Tab>
+</Tabs>
+
+## Creating an Ontology
+
+### Method 1: AI-Suggested Ontology
+
+Let Intellibase's AI design an ontology based on your use case:
+
+```bash
+curl -X POST https://api.intellibase.dev/api/v1/ontologies/suggest \
+  -H "Authorization: Bearer ib-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "usecase": "Track customer support tickets, agents, and resolutions. Include ticket categories, priority levels, and customer satisfaction."
+  }'
+```
+
+Response:
+
+```json
+{
+  "name": "Customer Support Ontology",
+  "schema": {
+    "ontology": {
+      "hierarchy": [
+        {
+          "level": 0,
+          "node_types": {
+            "Ticket": {
+              "properties": ["title", "priority", "status"],
+              "description": "Customer support ticket"
+            },
+            "Agent": {
+              "properties": ["name", "specialization", "active"],
+              "description": "Support agent"
+            },
+            "Customer": {
+              "properties": ["name", "tier", "email"],
+              "description": "Customer who filed ticket"
+            }
+          }
+        },
+        {
+          "level": 1,
+          "node_types": {
+            "Category": {
+              "aggregates": ["Ticket"],
+              "properties": ["name", "description"],
+              "description": "Ticket category or topic area"
+            }
+          }
+        }
+      ],
+      "edge_types": [
+        {
+          "name": "ASSIGNED_TO",
+          "source_types": ["Ticket"],
+          "target_types": ["Agent"],
+          "properties": ["assigned_date"],
+          "temporal": true,
+          "description": "Ticket assigned to agent"
+        }
+      ]
+    }
+  }
+}
+```
+
+<Info>
+  Review and modify the suggested ontology before creating it. The AI provides a starting point, but you know your domain best.
+</Info>
+
+### Method 2: Manual Design
+
+Design your ontology from scratch:
+
+```bash
+curl -X POST https://api.intellibase.dev/api/v1/ontologies \
+  -H "Authorization: Bearer ib-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d @ontology.json
+```
+
+## Ontology Design Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start with Level 0">
+    **Level 0** should contain concrete, directly extractable entities from text.
+    
+    ✅ Good Level 0 types:
+    - Person, Company, Product
+    - Document, Email, Meeting
+    - Transaction, Event, Location
+    
+    ❌ Avoid abstract concepts at Level 0:
+    - Category, Theme, Topic
+    - Cluster, Group, Collection
+  </Accordion>
+  
+  <Accordion title="Keep Hierarchy Shallow">
+    Aim for 2-3 levels maximum:
+    - **Level 0**: Concrete entities
+    - **Level 1**: Collections/categories
+    - **Level 2**: Themes/departments (optional)
+    
+    Deeper hierarchies become harder to maintain and query.
+  </Accordion>
+  
+  <Accordion title="Define Clear Relationships">
+    Be specific about valid source and target types:
+    
+    ```yaml
+    REPORTS_TO:
+      source_types: [Employee]  # Only employees can report to
+      target_types: [Manager]   # Only managers can be reported to
+      temporal: true            # Track when reporting started/ended
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Temporal Edges Wisely">
+    Mark relationships as temporal when they change over time:
+    
+    - ✅ Temporal: `WORKS_FOR`, `LOCATED_IN`, `ASSIGNED_TO`
+    - ❌ Non-temporal: `IS_A`, `PART_OF`, `AUTHORED_BY`
+  </Accordion>
+  
+  <Accordion title="Limit Properties">
+    Include only the most important properties. Too many properties can overwhelm the extraction LLM.
+    
+    - Aim for 3-7 properties per node type
+    - Focus on searchable, filterable attributes
+    - Avoid redundant properties
+  </Accordion>
+  
+  <Accordion title="No Cross-Level Edges (except hierarchy)">
+    Relationships should generally connect nodes at the **same level**, except for hierarchy relationships:
+    
+    - ✅ Level 0 → Level 0: `Developer WORKS_ON Feature`
+    - ✅ Level 0 → Level 1: `Developer BELONGS_TO Team` (hierarchy)
+    - ❌ Level 1 → Level 0: `Team MANAGES Developer` (use Level 0 → Level 1 instead)
+  </Accordion>
+</AccordionGroup>
+
+## Hierarchy Levels
+
+Understanding abstraction levels is key to effective ontology design:
+
+### Level 0: Concrete Entities
+
+Directly extractable from text, specific instances.
+
+**Examples:**
+- "Alice joined the team" → Extract `Alice` as `Developer`
+- "Feature-123 is in progress" → Extract `Feature-123` as `Feature`
+
+### Level 1: Collections/Categories
+
+Groups of Level 0 entities, inferred concepts.
+
+**Examples:**
+- Multiple developers → `Engineering Team`
+- Related features → `Project Alpha`
+
+### Level 2: High-Level Themes
+
+Broad organizational concepts, strategic groupings.
+
+**Examples:**
+- Multiple teams → `Engineering Department`
+- Multiple projects → `Product Division`
+
+<Info>
+  **Automatic Hierarchy Building**: Intellibase automatically creates Level 1+ nodes and hierarchy edges during ingestion by matching or creating parent nodes for Level 0 entities.
+</Info>
+
+## Example Ontologies
+
+<Tabs>
+  <Tab title="Research Papers">
+    ```yaml
+    ontology:
+      name: "Research Papers"
+      hierarchy:
+        - level: 0
+          node_types:
+            Paper:
+              properties: [title, year, doi, abstract]
+              description: "Academic paper"
+            Author:
+              properties: [name, institution, email]
+              description: "Paper author"
+            Concept:
+              properties: [name, definition]
+              description: "Key concept or method"
+        - level: 1
+          node_types:
+            ResearchArea:
+              aggregates: [Paper, Concept]
+              properties: [name, description]
+              description: "Field of research"
+      edge_types:
+        - AUTHORED_BY:
+            source_types: [Paper]
+            target_types: [Author]
+            temporal: false
+        - CITES:
+            source_types: [Paper]
+            target_types: [Paper]
+            properties: [context]
+            temporal: false
+        - DISCUSSES:
+            source_types: [Paper]
+            target_types: [Concept]
+            temporal: false
+    ```
+  </Tab>
+  
+  <Tab title="Business Operations">
+    ```yaml
+    ontology:
+      name: "Business Operations"
+      version: "1.0"
+      hierarchy:
+        - level: 0
+          node_types:
+            Employee:
+              properties: [name, role, hire_date]
+              description: "Company employee"
+            Client:
+              properties: [name, industry, tier]
+              description: "Business client"
+            Deal:
+              properties: [value, stage, expected_close]
+              description: "Sales opportunity"
+        - level: 1
+          node_types:
+            Account:
+              aggregates: [Client, Deal]
+              properties: [name, region]
+              description: "Client account"
+            Team:
+              aggregates: [Employee]
+              properties: [name, department]
+              description: "Business team"
+      edge_types:
+        - OWNS:
+            source_types: [Employee]
+            target_types: [Deal]
+            properties: [assigned_date]
+            temporal: true
+        - WORKS_WITH:
+            source_types: [Employee]
+            target_types: [Client]
+            temporal: true
+    ```
+  </Tab>
+  
+  <Tab title="Content Management">
+    ```yaml
+    ontology:
+      name: "Content Management"
+      version: "1.0"
+      hierarchy:
+        - level: 0
+          node_types:
+            Article:
+              properties: [title, published_date, status]
+              description: "Content article"
+            Author:
+              properties: [name, bio]
+              description: "Content creator"
+            Tag:
+              properties: [name]
+              description: "Content tag"
+        - level: 1
+          node_types:
+            Topic:
+              aggregates: [Article, Tag]
+              properties: [name, description]
+              description: "Content topic area"
+      edge_types:
+        - WRITTEN_BY:
+            source_types: [Article]
+            target_types: [Author]
+            temporal: false
+        - TAGGED_WITH:
+            source_types: [Article]
+            target_types: [Tag]
+            temporal: false
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Create a Project"
+    icon="folder-plus"
+    href="/api-reference/projects/create"
+  >
+    Create a KG+Vector project with your ontology
+  </Card>
+  <Card
+    title="Start Ingesting"
+    icon="upload"
+    href="/concepts/ingestion"
+  >
+    Add data and build your knowledge graph
+  </Card>
+</CardGroup>
+

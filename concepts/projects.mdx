@@ -1,0 +1,263 @@
+---
+title: "Projects"
+description: "Understanding Intellibase project modes and configuration"
+---
+
+## What is a Project?
+
+A **project** is an isolated workspace in Intellibase where you ingest data, build knowledge, and run queries. Each project has its own:
+
+- Storage namespace (isolated data)
+- Operating mode (KG+Vector or Vector-Only)
+- Configuration settings
+- Access controls
+
+## Project Modes
+
+Intellibase supports two distinct project modes, each optimized for different use cases:
+
+<Tabs>
+  <Tab title="Vector-Only Mode">
+    ### Vector-Only Mode
+    
+    **Simple, fast semantic search without knowledge graph construction**
+    
+    <Check>
+      **Best for:**
+      - Traditional RAG applications
+      - Document search
+      - Quick prototyping
+      - When relationships between entities aren't important
+    </Check>
+    
+    #### How It Works
+    
+    ```mermaid
+    graph LR
+        A[Raw Text] --> B[Chunk]
+        B --> C[Embed]
+        C --> D[Vector DB]
+    ```
+    
+    1. **Chunk**: Text is split into semantic chunks
+    2. **Embed**: Each chunk is converted to a vector embedding
+    3. **Store**: Embeddings are indexed in the vector database
+    
+    #### Features
+    
+    - ✅ Fast ingestion (no entity extraction)
+    - ✅ Low latency queries
+    - ✅ No ontology required
+    - ✅ Simple to set up
+    - ❌ No entity or relationship tracking
+    - ❌ No hierarchical concepts
+    - ❌ No temporal reasoning
+    
+    #### Example
+    
+    ```bash
+    curl -X POST https://api.intellibase.dev/api/v1/projects \
+      -H "Authorization: Bearer ib-your-api-key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Document Search",
+        "vector_only": true
+      }'
+    ```
+  </Tab>
+  
+  <Tab title="KG + Vector Mode">
+    ### KG + Vector Mode
+    
+    **Rich knowledge graphs with hierarchical reasoning and semantic search**
+    
+    <Check>
+      **Best for:**
+      - Complex domain modeling
+      - Tracking entities and relationships
+      - Temporal reasoning
+      - Multi-hop queries
+      - Hierarchical concepts
+    </Check>
+    
+    #### How It Works
+    
+    ```mermaid
+    graph TB
+        A[Raw Text] --> B[Chunk]
+        B --> C[Extract Entities]
+        C --> D[Extract Relations]
+        D --> E[Deduplicate]
+        E --> F[Build Hierarchy]
+        F --> G[Graph DB]
+        B --> H[Embed]
+        H --> I[Vector DB]
+    ```
+    
+    1. **Chunk**: Text is split into semantic chunks
+    2. **Extract**: LLM extracts entities and relationships
+    3. **Deduplicate**: Merge duplicate entities
+    4. **Hierarchy**: Build abstraction levels
+    5. **Store**: Graph DB + Vector DB
+    
+    #### Features
+    
+    - ✅ Entity and relationship tracking
+    - ✅ Hierarchical knowledge organization
+    - ✅ Temporal validity (bitemporal)
+    - ✅ Graph traversal queries
+    - ✅ Hybrid retrieval (graph + vector)
+    - ❌ Slower ingestion (LLM extraction)
+    - ❌ Requires ontology design
+    - ❌ Higher complexity
+    
+    #### Example
+    
+    ```bash
+    # First create an ontology
+    curl -X POST https://api.intellibase.dev/api/v1/ontologies \
+      -H "Authorization: Bearer ib-your-api-key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Engineering Ontology",
+        "version": "1.0",
+        "schema": { ... }
+      }'
+    
+    # Then create project with the ontology
+    curl -X POST https://api.intellibase.dev/api/v1/projects \
+      -H "Authorization: Bearer ib-your-api-key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Engineering Knowledge Base",
+        "ontology_id": "ont-123",
+        "vector_only": false
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Mode Comparison
+
+| Feature | Vector-Only | KG + Vector |
+|---------|-------------|-------------|
+| **Setup Complexity** | Simple | Moderate |
+| **Ontology Required** | No | Yes |
+| **Ingestion Speed** | Fast | Slower (LLM extraction) |
+| **Query Latency** | Low | Moderate |
+| **Entity Tracking** | ❌ | ✅ |
+| **Relationships** | ❌ | ✅ |
+| **Temporal Reasoning** | ❌ | ✅ |
+| **Hierarchies** | ❌ | ✅ |
+| **Graph Traversal** | ❌ | ✅ |
+| **Semantic Search** | ✅ | ✅ |
+| **Use Case** | RAG, document search | Complex reasoning, agent memory |
+
+## Project Configuration
+
+When creating a project, you can customize various settings:
+
+```json
+{
+  "name": "My Project",
+  "ontology_id": "ont-123",  // Optional for Vector-Only
+  "vector_only": false
+}
+```
+
+## Managing Projects
+
+### Creating a Project
+
+See the [API Reference](/api-reference/projects/create) for detailed information.
+
+### Listing Projects
+
+```bash
+curl https://api.intellibase.dev/api/v1/projects \
+  -H "Authorization: Bearer ib-your-api-key"
+```
+
+Response includes mode and statistics:
+
+```json
+{
+  "projects": [
+    {
+      "project_id": "proj-123",
+      "name": "My Project",
+      "mode": "kg_vector",
+      "created_at": "2024-01-01T00:00:00Z",
+      "stats": {
+        "total_nodes": 1234,
+        "total_edges": 2345,
+        "total_chunks": 456
+      }
+    }
+  ]
+}
+```
+
+### Deleting a Project
+
+<Warning>
+  Deleting a project permanently removes all data including nodes, edges, vectors, and metadata. This cannot be undone.
+</Warning>
+
+```bash
+curl -X DELETE https://api.intellibase.dev/api/v1/projects/{project_id} \
+  -H "Authorization: Bearer ib-your-api-key"
+```
+
+## Choosing the Right Mode
+
+<Steps>
+  <Step title="Define Your Requirements">
+    Ask yourself:
+    - Do I need to track entities and relationships?
+    - Will I query about connections between entities?
+    - Do I need temporal reasoning?
+    - Is my domain hierarchical?
+  </Step>
+  
+  <Step title="Consider Complexity vs. Power">
+    **Vector-Only** is simpler but less powerful. **KG+Vector** requires more setup but enables sophisticated reasoning.
+  </Step>
+  
+  <Step title="Start Simple, Upgrade Later">
+    If unsure, start with **Vector-Only** to validate your use case. You can always create a new KG+Vector project later with a custom ontology.
+  </Step>
+</Steps>
+
+## Migration Between Modes
+
+Currently, projects cannot change modes after creation. To migrate:
+
+1. Create a new project in the desired mode
+2. Re-ingest your data into the new project
+3. Update your application to use the new project ID
+4. Delete the old project when ready
+
+<Info>
+  **Coming Soon**: We're working on project mode migration tools.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Design an Ontology"
+    icon="sitemap"
+    href="/concepts/ontologies"
+  >
+    Create a custom ontology for KG+Vector projects
+  </Card>
+  <Card
+    title="Ingest Data"
+    icon="upload"
+    href="/concepts/ingestion"
+  >
+    Learn how to add data to your project
+  </Card>
+</CardGroup>
+
