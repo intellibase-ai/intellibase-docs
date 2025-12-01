@@ -1,11 +1,13 @@
 ---
 title: "Welcome to Intellibase"
-description: "Knowledge graph and vector database engine for AI agents"
+description: "The context engineering layer for your agents"
 ---
 
 ## What is Intellibase?
 
-Intellibase is a modular **knowledge graph (KG) + vector database** context engine designed to give AI agents rich, long-term memory. It provides two powerful operating modes:
+Intellibase is a modular Modular knowledge graph powered context/ memory engine that uniquely adapts to 
+your agent's use-case enabling it to have a nuanced understanding of the knowledge it needs to work.
+It provides two powerful operating modes:
 
 <CardGroup cols={2}>
   <Card
@@ -24,125 +26,13 @@ Intellibase is a modular **knowledge graph (KG) + vector database** context engi
   </Card>
 </CardGroup>
 
-## Key Features
-
-<CardGroup cols={2}>
-  <Card
-    title="Custom Ontologies"
-    icon="sitemap"
-  >
-    Define your domain-specific entity types, relationships, and hierarchies
-  </Card>
-  <Card
-    title="Temporal Awareness"
-    icon="clock"
-  >
-    Track both transaction time and real-world validity of facts
-  </Card>
-  <Card
-    title="Hybrid Retrieval"
-    icon="magnifying-glass"
-  >
-    Combine graph traversal with vector similarity search
-  </Card>
-  <Card
-    title="Flexible Deployment"
-    icon="server"
-  >
-    Run locally or in production with pluggable storage backends
-  </Card>
-</CardGroup>
-
-## How It Works
-
-### 1. Define Your Ontology
-
-Create a custom ontology that describes your domain's entities, relationships, and hierarchical structure.
-
-<Info>
-For vector-only projects, you can skip this step and go straight to ingestion.
-</Info>
-
-### 2. Create a Project
-
-Projects can operate in two modes:
-- **KG + Vector**: Requires an ontology; enables graph-based reasoning
-- **Vector-Only**: No ontology needed; fast semantic search only
-
-### 3. Ingest Data
-
-Send text data to Intellibase. Depending on your project mode:
-- **KG + Vector**: Extracts entities, builds relationships, creates hierarchies, and indexes chunks
-- **Vector-Only**: Chunks text and creates vector embeddings
-
-### 4. Query Your Data
-
-Ask natural language questions. Intellibase automatically:
-- Classifies the query type (KG, vector, or hybrid)
-- Plans the optimal retrieval strategy
-- Retrieves and ranks results
-- Formats a comprehensive response
-
-## Query Modes
-
-Intellibase supports two query modes:
-
-<Tabs>
-  <Tab title="Static Mode">
-    **Low-latency, deterministic retrieval**
-    
-    - Single-pass classification and retrieval
-    - Predictable performance
-    - Ideal for production applications
-    - Default mode
-  </Tab>
-  <Tab title="Dynamic Mode">
-    **Agentic, multi-step reasoning**
-    
-    - LLM-driven query planning and refinement
-    - Adaptive retrieval strategies
-    - Best for complex, exploratory queries
-    - Higher latency but more intelligent
-  </Tab>
-</Tabs>
-
-## Use Cases
-
-<AccordionGroup>
-  <Accordion title="AI Agent Memory">
-    Give your AI agents persistent, queryable memory with temporal awareness. Track entities, relationships, and how they evolve over time.
-  </Accordion>
-  <Accordion title="Document Understanding">
-    Build rich knowledge graphs from unstructured text. Extract entities, relationships, and hierarchical concepts automatically.
-  </Accordion>
-  <Accordion title="Semantic Search">
-    Fast vector-only mode for traditional RAG applications without the complexity of knowledge graphs.
-  </Accordion>
-  <Accordion title="Research & Analysis">
-    Track complex relationships between concepts, papers, authors, and findings with temporal validity.
-  </Accordion>
-</AccordionGroup>
-
-## Get Started
+## Ready to Get Started?
 
 <Card
-  title="Quickstart Guide"
+  title="Quick Start Guide"
   icon="rocket"
   href="/quickstart"
-  horizontal
+  color="#10b981"
 >
-  Get up and running with Intellibase in 5 minutes
+  Learn how to set up Intellibase, create your first project, and start building intelligent agents in minutes
 </Card>
-
-## Architecture
-
-Intellibase is built on a modular architecture with pluggable components:
-
-- **Storage Layer**: Neo4j (graph), Qdrant (vectors), PostgreSQL (metadata)
-- **Processing Layer**: LLM-based extraction, deduplication, hierarchy building
-- **Query Layer**: Intelligent orchestration with mode-aware retrieval
-- **API Layer**: RESTful FastAPI endpoints with OpenAPI documentation
-
-<Info>
-  **Prerequisites**: Node.js 19+ for local development
-</Info>
